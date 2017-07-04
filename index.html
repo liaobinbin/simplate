@@ -34,9 +34,11 @@
             {desc}</strong>
         </div>
 
+        <!--parent scope-->
         <div>
+            <!--sub scope-->
             <div repeater="list">
-             {index} {name} <button style="margin-left:20px" onclick="deleteItem({index})">删除</button>
+             {systemTime} {name} <button style="margin-left:20px" onclick="deleteItem({index})">删除</button>
             </div>
         </div>
         <button onclick="addItem()">添加元素</button>
