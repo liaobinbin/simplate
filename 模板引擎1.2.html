@@ -1,0 +1,332 @@
+<html>
+
+<head>
+    <title>数据绑定</title>
+    <style>
+        .color-red {
+
+            color: red;
+        }
+
+        .color-blue {
+            color: blue;
+        }
+    </style>
+</head>
+
+<body>
+
+
+    <div id="container">
+        version:v{version}
+        <div class="{dynamicClassName} {name}">className:{dynamicClassName} <button onclick="changeClassName()">Change Class</button></div>
+        <div>
+            <span style="font-size:{fontSize}px;width:100px;display:inline-block">
+            Date:{systemTime} 
+            </span>
+
+            <strong>
+            {desc}</strong>
+        </div>
+
+        <div>
+            <div repeater="list">
+                {name} <button style="margin-left:20px" onclick="deleteItem({index})">删除</button>
+            </div>
+        </div>
+        <button onclick="addItem()">添加元素</button>
+
+        <div>
+            name: {info.name} <button onclick="setName()">set name</button>
+            <br> author:{info.author}
+        </div>
+
+    </div>
+
+    </div>
+
+
+    <script>
+        // 支持属性和innertext 的动态数据绑定
+        // 下一步将支持 array 
+        function SimpleTemplateEngine(node, sourceData = {},parent) {
+            this.node = node;
+            this.source = sourceData;
+            this.directives={};
+            this.listeners = {};
+            this.parent=parent;// 如果一个视图中，存在作用域嵌套，子作用域通过parent来访问父级source
+            this.parseHtml(this.node.childNodes);
+        }
+
+
+        // 遍历整个dom，找到所有的 {fieldName} 建立创建一个 DataBinder对象
+        SimpleTemplateEngine.prototype.parseHtml = function (children) {
+
+            // 拷贝一个副本
+            children = Array.prototype.slice.call(children);
+            for (var i = 0; i < children.length; i++) {
+                var node = children[i];
+                var attrs =Array.prototype.slice.call (node.attributes ||[]);
+                if (attrs&& attrs.length > 0) {
+                    var repeaterIndex =attrs.findIndex(item=>item.name==="repeater");
+                    if(repeaterIndex>-1){
+                        this.bindArray(node,node.attributes[repeaterIndex]);
+                        continue;
+                    }
+                    this.handleAttributeContent(node.attributes);
+                }
+                if (node.nodeType === 3) {// 只处理 text 类型的节点，字符串
+                    var newNodes = this.handleTextContent(node.textContent, node, node.parentNode);
+                    var parentNode = node.parentNode;
+                    newNodes.forEach(item => {
+                        parentNode.insertBefore(item, node);
+                    });
+                    parentNode.removeChild(node);
+                    this.bindData(newNodes);
+                }
+                if (node.childNodes.length > 0) {
+                    this.parseHtml(node.childNodes);
+                }
+            }
+        }
+         SimpleTemplateEngine.prototype.handleTextContent = function (content) {
+            var reg = /\{\s*\w+(\.\w+)*\s*\}/g
+
+            var field = null;
+            var index = 0;
+            var resultTextNodes = []
+
+            while (field = reg.exec(content)) {
+                var text = content.slice(index, field.index);
+                index = field.index + field[0].length;
+                if (index > 0) {
+                    resultTextNodes.push(text);
+                }
+                resultTextNodes.push(field[0])
+            }
+            let matchedLength = resultTextNodes.join('').length;
+            if (matchedLength !== content.length) {
+                resultTextNodes.push(content.slice(matchedLength));
+            }
+            return resultTextNodes.map(item => document.createTextNode(item));
+        }
+         SimpleTemplateEngine.prototype.handleAttributeContent = function (attributes) {
+            Array.prototype.slice.call(attributes).forEach(item => {
+               
+                item.nodeValue = item.nodeValue.replace(/({\w+(\.\w+)*})/g, (field) => {
+                    var key = field.slice(1, -1).trim();
+                    var listener = this.addListener(item, key, item.nodeValue);
+                    return listener.data;
+                })
+            });
+        }
+
+        SimpleTemplateEngine.prototype.bindData = function (nodes) {
+            nodes.forEach(item => {
+                var data = item.data;
+                if (data[0] === "{" && data[data.length - 1] === "}") {
+                    var field = data.slice(1, -1).trim();
+                    item.nodeValue =this.getSourceValueWithPath(field);
+                    this.handleExpression(field, item);
+                }
+            });
+        }
+        
+        SimpleTemplateEngine.prototype.bindArray=function(node/**循环的对象**/,attr){
+                var expression =attr.nodeValue;
+                var value = this.getSourceValueWithPath(expression);
+
+                
+            
+                if(!Array.isArray(value))return ;
+                value.forEach((item,index)=>item.index=index);
+                if (!this.listeners[expression]) {
+                    this.listeners[expression] = [];
+                }
+                var listener = new ArrayBinder(this, node, expression, null,node.parentNode);
+                this.listeners[expression].push(listener);
+                for(var i=0;i<value.length;i++){
+                  var copy =node.cloneNode(true);
+                  var vm =  new SimpleTemplateEngine(copy,value[i],this);
+                  node.parentNode.insertBefore(copy,node);
+                }
+                node.parentNode.removeChild(node);
+                
+        }
+        SimpleTemplateEngine.prototype.addListener = function (item, key, attributes) {
+            if (!this.listeners[key]) {
+                this.listeners[key] = [];
+            }
+            var listener = new DataBinder(this, item, key, attributes);
+            this.listeners[key].push(listener);
+            return listener;
+        }
+
+        SimpleTemplateEngine.prototype.getSourceValueWithPath = function (path, returnObj) {
+            var pathArray = path.split(".");
+
+            if (pathArray.length === 1) return returnObj ? this.source : this.source[pathArray[0]];
+
+
+            var obj = this.source[pathArray.shift()];
+            while (pathArray.length > 1) {
+                obj = obj[pathArray.shift()];
+            }
+            return returnObj ? obj : obj[pathArray[0]];
+
+        }
+       
+        SimpleTemplateEngine.prototype.handleExpression = function (expression, item, attributes) {
+            var filed, filters;
+            if (expression.indexOf("|") > -1) { // filters;
+                filters = expression.split("|");
+                filed = filters[0].trim();
+            } else {
+                filed = expression;
+            }
+
+            this.addListener(item, filed, attributes);
+
+        }
+
+
+       
+
+       function ArrayBinder(context,node,field,expression,parentNode){
+           DataBinder.apply(this,arguments);
+           this.parentNode=parentNode;
+       }
+
+       ArrayBinder.prototype= Object.create(DataBinder.prototype);
+       ArrayBinder.prototype.bind=function(){
+           this.data.insertAt=this.insertAt.bind(this);
+           this.data.deleteIn=this.deleteIn.bind(this);
+       }
+
+       ArrayBinder.prototype.insertAt=function(obj,index/**可选，如果没有则插在最后*/){
+            var copy = this.node.cloneNode(true);
+            var view = new SimpleTemplateEngine(copy,obj,this.context);
+            if(index ===void 0) {
+                this.data.push(obj);
+                console.log([this.node])
+                this.parentNode.appendChild(copy);
+            }
+            else {
+                this.data.splice(index,0,obj);
+                this.parentNode.insertBefore(copy,this.parentNode.children[index]);
+            }
+
+            this.notifyChange();
+            
+
+       }
+       ArrayBinder.prototype.notifyChange=function(){
+           this.data.forEach((item,index)=>item.index=index);
+       }
+       ArrayBinder.prototype.deleteIn=function(index){
+            this.data.splice(index,1);
+            this.parentNode.removeChild(this.parentNode.children[index]);
+            this.notifyChange();
+       }
+       
+       
+        // 发现一个表达式，就添加一个监听器
+        
+        // parseHtml解析到每一个节点，只有有innerText 就会用这个函数来处理
+       
+        // 建立模板字段与dom元素的绑定关系，当数据源改变时候 修改对应的dom
+        function DataBinder(context, node, field, expression) {
+            this.data = context.getSourceValueWithPath(field);
+            this.field = field;
+            this.node = node;// attr or textNode
+            this.context = context;
+            this.expression = expression;// attr nodeValue
+            this.bind();
+
+        }
+
+        DataBinder.prototype.bind = function () {
+            Object.defineProperty(
+                this.getDefineObject(this.field),
+                this.getDefineKey(this.field),
+                {
+                    set: (value) => {
+                        this.notifyChange(value);
+                    }, get: (vaue) => {
+                        return this.data;
+                    }
+                })
+
+        }
+        DataBinder.prototype.getDefineObject = function (field) {
+            return this.context.getSourceValueWithPath(field, true);
+        }
+        DataBinder.prototype.getDefineKey = function (field) {
+            return field.split('.').slice(-1);
+        }
+        DataBinder.prototype.notifyChange = function (newValue) {
+            this.data = newValue;
+            this.context.listeners[this.field].forEach(item => {
+                if (item.node instanceof Attr) {
+                    item.node.nodeValue = item.expression.replace(/({\w+(\.\w+)*})/g, (filed => {
+                        return this.context.source[filed.slice(1, -1).trim()];
+                    }))
+                } else if (item.node instanceof Node) {
+                    item.node.nodeValue = newValue
+                }
+            });
+
+
+        }
+
+
+
+
+
+
+
+        //test
+        function changeClassName() {
+            if (source.dynamicClassName === "color-red") {
+                source.dynamicClassName = "color-blue"
+            } else {
+                source.dynamicClassName = "color-red"
+            }
+        }
+
+        function setName(){
+            source.info.name="张三"
+        }
+        function addItem(){
+            source.list.insertAt({name:"ggooooooo"});
+        }
+
+        function deleteItem(index){
+            source.list.deleteIn(index);
+        }
+
+        setInterval(() => source.systemTime = new Date().toLocaleTimeString(), 1000);
+
+        var source = {
+            list:[
+                {
+                    name:'Zh san',index:0
+                },{
+                    name:'Lii s',index:1
+                },{
+                    name:"Wang er",index:2
+                }
+            ],
+            fontSize: 12,
+            info: {
+                name: "simplate",
+                author: "xiao mao"
+            },
+            desc: "Super simple template framework", systemTime: new Date().toLocaleTimeString(), dynamicClassName: "color-red", message: "world", name: "cat", templateName: "Simplate", version: "1.0.1"
+        };
+        var vm = new SimpleTemplateEngine(document.querySelector("#container"), source);
+    </script>
+
+</body>
+
+</html>
