@@ -2,9 +2,9 @@
 
 <head>
     <title>数据绑定</title>
-    <script src="lib/parser.js" type="javascript"></script>
-    <script src="lib/binder.data.js" type="javascript"></script>
-    <script src="lib/binder.array.js" type="javascript"></script>
+    <script type="text/javascript" src="lib/parser.js" ></script>
+    <script type="text/javascript" src="lib/binder.data.js" ></script>
+    <script type="text/javascript" src="lib/binder.array.js" ></script>
     
     
     <style>
@@ -36,7 +36,7 @@
 
         <div>
             <div repeater="list">
-                {name} <button style="margin-left:20px" onclick="deleteItem({index})">删除</button>
+             {index} {name} <button style="margin-left:20px" onclick="deleteItem({index})">删除</button>
             </div>
         </div>
         <button onclick="addItem()">添加元素</button>
@@ -76,6 +76,9 @@
             }
         }
 
+        function localChange(index){
+            source.list[index].dynamicClassName='local-changed';
+        }
         function setName(){
             source.info.name="张三"
         }
