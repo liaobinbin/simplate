@@ -8,13 +8,30 @@
     
     
     <style>
-        .color-red {
 
-            color: red;
+        *{
+            padding: 0;
+            margin: 0;
         }
-
-        .color-blue {
-            color: blue;
+        html,body{
+            height: 100%;
+            width: 100%;
+            position: relative;
+    
+        }
+        .drag{
+            width: 100px;
+            height: 100px;
+            background: #f1f1f1;
+            border-radius: 3px;
+            box-shadow: 0 0 3px rgba(0,0,0,0.1);
+            position: absolute;
+        }
+        .drag:hover{
+            cursor: -webkit-grab
+        }
+        .drag:active{
+            cursor: -webkit-grabbing
         }
     </style>
 </head>
@@ -23,97 +40,48 @@
 
 
     <div id="container">
-        version:v{version}
-        <div class="{dynamicClassName} {name}">className:{dynamicClassName} <button onclick="changeClassName()">Change Class</button></div>
-        <div>
-            <span style="font-size:{fontSize}px;width:100px;display:inline-block">
-            Date:{systemTime} 
-            </span>
-
-            <strong>
-            {desc}</strong>
-        </div>
-
-        <MyCustomeComponent/>
-
-        <!--parent scope-->
-        <div>
-            <!--sub scope-->
-            <div repeater="list">
-             {systemTime} {name} <button style="margin-left:20px" onclick="deleteItem({index})">删除</button>
-            </div>
-        </div>
-        <button onclick="addItem()">添加元素</button>
-
-        <div>
-            name: {info.name} <button onclick="setName()">set name</button>
-            <br> author:{info.author}
-        </div>
-
+        <div  style="left:{x}px;top:{y}px" class="drag"></div>
+        <custom-view/>
     </div>
 
     </div>
+
 
 
     <script>
-        // 支持属性和innertext 的动态数据绑定
-        // 下一步将支持 array 
-       
 
-
-       
-
-       
-
-
-
-
-
-
-
-        //test
-        function changeClassName() {
-            if (source.dynamicClassName === "color-red") {
-                source.dynamicClassName = "color-blue"
-            } else {
-                source.dynamicClassName = "color-red"
+        class view {
+            getSource(){
+                return {name:"位置信息："};
+            }
+            render(){
+                return `<div style="color:red">{name} x:{x} y:{y} </div>`;
             }
         }
-
-        function localChange(index){
-            source.list[index].dynamicClassName='local-changed';
+    
+       var source ={x:0,y:0}
+       var dragDom=document.querySelector(".drag");
+            document.addEventListener("mousemove",mouseMove,false);
+            document.addEventListener("mouseup",mouseUp,false);
+            dragDom.addEventListener("mousedown",mouseDown,false);
+       var offsetX,offsetY,draging; 
+        function mouseDown(e){
+            e.preventDefault()
+            var rect =dragDom.getBoundingClientRect();
+                offsetX= e.pageX-rect.left;
+                offsetY=e.pageY-rect.top;
+                draging=true;
         }
-        function setName(){
-            source.info.name="张三"
-        }
-        function addItem(){
-            source.list=[{name:"checkin"},{name:"go"}]
-        }
+        function mouseMove(e){
+            if(!draging) return;
+            e.preventDefault();
+            source.x=e.pageX -offsetX;
+            source.y=e.pageY -offsetY;
+        }  
+        function mouseUp(){draging=false}  
+        SimpleTemplateEngine.applyComponent("custom-view",view);
+       var drag = new SimpleTemplateEngine(document.querySelector("#container"),source);
 
-        function deleteItem(index){
-            source.list.deleteIn(index);
-        }
-
-        setInterval(() => source.systemTime = new Date().toLocaleTimeString(), 1000);
-
-        var source = {
-            list:[
-                {
-                    name:'Zh san',index:0
-                },{
-                    name:'Lii s',index:1
-                },{
-                    name:"Wang er",index:2
-                }
-            ],
-            fontSize: 12,
-            info: {
-                name: "simplate",
-                author: "xiao mao"
-            },
-            desc: "Super simple template framework", systemTime: new Date().toLocaleTimeString(), dynamicClassName: "color-red", message: "world", name: "cat", templateName: "Simplate", version: "1.0.1"
-        };
-        var vm = new SimpleTemplateEngine(document.querySelector("#container"), source);
     </script>
 
 </body>
