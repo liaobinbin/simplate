@@ -2,35 +2,42 @@
 
 <head>
     <title>数据绑定</title>
-    <script type="text/javascript" src="lib/parser.js" ></script>
-    <script type="text/javascript" src="lib/binder.data.js" ></script>
-    <script type="text/javascript" src="lib/binder.array.js" ></script>
-    
-    
-    <style>
+    <script type="text/javascript" src="lib/parser.js"></script>
+    <script type="text/javascript" src="lib/binder.data.js"></script>
+    <script type="text/javascript" src="lib/binder.array.js"></script>
 
-        *{
+
+    <style>
+        * {
             padding: 0;
             margin: 0;
         }
-        html,body{
+
+        html,
+        body {
             height: 100%;
             width: 100%;
             position: relative;
-    
         }
-        .drag{
+
+        .drag {
             width: 100px;
             height: 100px;
             background: #f1f1f1;
             border-radius: 3px;
-            box-shadow: 0 0 3px rgba(0,0,0,0.1);
+            box-shadow: 0 0 3px rgba(0, 0, 0, 0.1);
             position: absolute;
+            font-family: '微软雅黑';
+            font-size: 12px;
+            left: 0;
+            top: 0;
         }
-        .drag:hover{
+
+        .drag:hover {
             cursor: -webkit-grab
         }
-        .drag:active{
+
+        .drag:active {
             cursor: -webkit-grabbing
         }
     </style>
@@ -40,8 +47,16 @@
 
 
     <div id="container">
-        <div  style="left:{x}px;top:{y}px" class="drag"></div>
-        <custom-view/>
+
+
+        <drag-view></drag-view>
+        <drag-view></drag-view>
+        <drag-view></drag-view>
+        
+        <!--component scope-->
+
+        <!--root scope-->
+
     </div>
 
     </div>
@@ -49,39 +64,53 @@
 
 
     <script>
-
-        class view {
-            getSource(){
-                return {name:"位置信息："};
+        class DragView {
+            getSource() {
+                return { x: 0, y: 0 };
             }
-            render(){
-                return `<div style="color:red">{name} x:{x} y:{y} </div>`;
+            onInited() {
+                var offsetX, offsetY, draging,self=this;
+                function mouseDown(e) {
+                    e.preventDefault()
+                    var rect = self.refs.drag.getBoundingClientRect();
+                    offsetX = e.pageX - rect.left;
+                    offsetY = e.pageY - rect.top;
+                    draging = true;
+                }
+                function mouseMove(e) {
+                    if (!draging) return;
+                    e.preventDefault();
+                    self.source.x = e.pageX - offsetX;
+                    self.source.y = e.pageY - offsetY;
+                }
+                function mouseUp() { draging = false }
+                document.addEventListener("mousemove", mouseMove, false);
+                document.addEventListener("mouseup", mouseUp, false);
+                this.refs.drag.addEventListener("mousedown", mouseDown, false);
+            }
+            showX() {
+                console.log(this.source.x);
+            }
+            showY() {
+                console.log(this.source.y);
+            }
+            render() {
+                return `
+                <div #drag class="drag" style="transform:translate({x}px,{y}px)">
+                    <p @click="showX">x:{x}px</p>
+                    <p @click="showY">y:{y}px</p>
+                </div>
+                `;
             }
         }
-    
-       var source ={x:0,y:0}
-       var dragDom=document.querySelector(".drag");
-            document.addEventListener("mousemove",mouseMove,false);
-            document.addEventListener("mouseup",mouseUp,false);
-            dragDom.addEventListener("mousedown",mouseDown,false);
-       var offsetX,offsetY,draging; 
-        function mouseDown(e){
-            e.preventDefault()
-            var rect =dragDom.getBoundingClientRect();
-                offsetX= e.pageX-rect.left;
-                offsetY=e.pageY-rect.top;
-                draging=true;
-        }
-        function mouseMove(e){
-            if(!draging) return;
-            e.preventDefault();
-            source.x=e.pageX -offsetX;
-            source.y=e.pageY -offsetY;
-        }  
-        function mouseUp(){draging=false}  
-        SimpleTemplateEngine.applyComponent("custom-view",view);
-       var drag = new SimpleTemplateEngine(document.querySelector("#container"),source);
 
+
+
+
+
+
+        SimpleTemplateEngine.applyComponent("drag-view", DragView);
+        var drag = new SimpleTemplateEngine(document.querySelector("#container"));
     </script>
 
 </body>
